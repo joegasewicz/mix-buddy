@@ -4,3 +4,5 @@ copy_component:
 
 logic_pro_logs:
 	log stream --predicate 'process == "Logic Pro"' --style compact
+
+init_logs:

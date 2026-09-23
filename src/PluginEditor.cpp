@@ -24,7 +24,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 
     g.setColour(juce::Colour::fromRGB(235, 238, 242));
     g.setFont(juce::FontOptions(28.0f, juce::Font::bold));
-    g.drawFittedText("Mix Buddy", bounds.removeFromTop(48), juce::Justification::centred, 1);
+    g.drawFittedText("Mix Buddy - ALEMBIC", bounds.removeFromTop(48), juce::Justification::centred, 1);
 
     g.setColour(juce::Colour::fromRGB(150, 158, 168));
     g.setFont(juce::FontOptions(15.0f));

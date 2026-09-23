@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 
 #include <memory>
+#include "utils/logging.h"
 
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
@@ -14,10 +15,14 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                      #endif
                        )
 {
+    Log::initialise();
+    Log::info("MixBuddy plugin created");
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
 {
+    Log::info("MixBuddy plugin destroyed.");
+    Log::shutdown();
 }
 
 //==============================================================================
