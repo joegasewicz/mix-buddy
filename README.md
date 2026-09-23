@@ -1,5 +1,7 @@
 # Mix Buddy VST Plugin
 
+<img src="assets/mixbuddy.png" alt="Example" style="max-width: 600px;">
+
 
 ### Build
 Initialize git submodules
