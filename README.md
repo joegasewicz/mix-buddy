@@ -1,10 +1,15 @@
-# Mix Buddy Plugin
+# Mix Buddy VST Plugin
 
 
 ### Build
 Initialize git submodules
 ```
 git submodule update --init --recursive
+```
+Build project
+```
+cmake --build /Users/joegasewicz/CLionProjects/mix-buddy/cmake-build-debug --target MixBuddy_AU -j 6
+make copy_component
 ```
 
 ### Development
