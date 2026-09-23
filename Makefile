@@ -5,4 +5,5 @@ copy_component:
 logic_pro_logs:
 	log stream --predicate 'process == "Logic Pro"' --style compact
 
-init_logs:
+build:
+	cmake --build ~/CLionProjects/mix-buddy/cmake-build-debug --target MixBuddy_AU -j 6

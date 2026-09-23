@@ -1,6 +1,6 @@
 # Mix Buddy VST Plugin
 
-<img src="assets/mixbuddy.png" alt="Example" style="max-width: 600px;">
+<img src="assets/mixbuddy2.png" alt="Example" style="max-width: 400px;">
 
 
 ### Build
