@@ -1,133 +1,159 @@
-# Repository Update Policy
+# Agent Working Notes
 
-Only the project owner may submit changes to this repository. AI agents may provide guidance, implementation plans, code snippets, examples, reviews, and troubleshooting help for the next steps of the project, but the project owner is the only person who should apply, commit, or submit repository changes.
+## Repository Policy
 
-Agents working from this file should treat the repository as advisory-only unless the project owner explicitly updates this policy.
+Only the project owner should commit or submit repository changes.
 
-# Project Brief
+Agents may directly update this `AGENTS.md` file. For other files, follow the user's current instruction and preserve any unrelated user changes.
 
-This project is intended to become a C++ audio plugin for Logic Pro that helps mix individual tracks using the OpenAI/ChatGPT API. The long-term target is a plugin system where each track can host an instance that analyses and proposes or applies processing, while an overall supervisor can inspect the whole session context and coordinate a balanced mix.
+## Current Project State
 
-The current repository is only the default CLion C++ starter project. No audio plugin framework, DSP code, OpenAI client, or Logic Pro integration has been added yet.
+Mix Buddy is a C++20 JUCE audio plugin project built with CMake in CLion.
 
-## Product Goal
+Current baseline:
 
-Build an audio plugin for Logic Pro that can:
+- `external/JUCE` is present as a JUCE submodule/checkout.
+- `CMakeLists.txt` defines a `MixBuddy` JUCE plugin target.
+- Plugin formats include `AU`, `VST3`, and `Standalone`.
+- The AU build has loaded successfully on a Logic Pro track.
+- Source files currently live under `src/`:
+  - `PluginProcessor.h`
+  - `PluginProcessor.cpp`
+  - `PluginEditor.h`
+  - `PluginEditor.cpp`
 
-- Run on individual audio tracks as a normal plugin insert.
-- Analyse track audio and track metadata where available.
-- Communicate with an OpenAI API backend to request mix guidance.
-- Suggest or automate settings such as gain staging, EQ, compression, panning, sends, and broad tonal balance.
-- Provide a supervisor view that can reason about all participating track instances and coordinate an overall mix.
-- Keep critical audio processing real-time safe and avoid network calls on the audio thread.
+Useful local commands:
 
-## Likely Plugin Direction
+```sh
+cmake -S . -B cmake-build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build cmake-build-debug --target MixBuddy_Standalone
+cmake --build cmake-build-debug --target MixBuddy_AU
+```
 
-Logic Pro primarily supports Audio Units on macOS, so the first serious implementation should target an AU/AUv3 plugin. JUCE is likely the most practical framework for cross-format audio plugin development from C++, even if Logic Pro is the first host target.
+The built AU component is expected at:
 
-Expected early technical direction:
+```text
+cmake-build-debug/MixBuddy_artefacts/Debug/AU/Mix Buddy.component
+```
 
-- Use C++20 or newer where practical.
-- Replace the starter executable with a plugin-oriented project structure.
-- Prefer JUCE for plugin scaffolding, UI, host integration, parameters, and audio/MIDI plumbing unless there is a clear reason to use Apple Audio Unit APIs directly.
-- Keep DSP code independent from UI and API networking code.
-- Use CMake if possible, since the project was started in CLion, but follow the chosen framework's normal build conventions.
+## Product Direction
 
-## Architecture Notes
+Build a Logic Pro audio plugin that helps evaluate and eventually adjust mixes using AI.
 
-The system should separate these concerns:
+The product should begin as a single-track analysis tool, then add structured parameter suggestions, then add a supervisor plugin for whole-mix coordination.
 
-- `AudioProcessor`: real-time-safe audio processing, parameter state, metering, and analysis buffers.
-- `Analysis`: feature extraction such as loudness, peak/RMS, spectral balance, dynamics, stereo width, silence, and transient information.
-- `OpenAIClient`: async API communication, request shaping, response parsing, retries, and error reporting.
-- `MixModel`: local representation of tracks, plugin instances, parameters, recommendations, and supervisor decisions.
-- `Supervisor`: session-level coordination across track instances.
-- `UI`: plugin controls, analysis status, suggestions, approval/apply flows, and API settings.
+Keep audio pass-through reliable while building features incrementally.
 
-Network requests must never run on the audio thread. Any API call should be asynchronous and communicate back through thread-safe queues, atomics, locks kept outside real-time callbacks, or framework-supported message-thread mechanisms.
+## MVP 1: Single-Track AI Opinion
 
-## Track And Supervisor Design
+Goal: one plugin instance analyses one track and displays an AI-written opinion. No automatic setting changes.
 
-The intended model is:
+User flow:
 
-- Each track plugin instance collects local analysis and exposes controllable mix parameters.
-- Instances can identify themselves with a user-provided track name or generated instance ID.
-- A supervisor can gather summarized state from all active instances.
-- The supervisor asks the OpenAI API for whole-mix recommendations and sends track-specific instructions back to each instance.
+1. User inserts Mix Buddy on a Logic Pro track.
+2. Plugin captures a bounded audio sample or feature summary from the track.
+3. User can type extra context/questions in the plugin UI before sending, such as:
+   - "Is this vocal too harsh?"
+   - "How should I EQ this bass?"
+   - "Give me mix advice for a modern pop vocal."
+4. Plugin sends the request to an AI provider.
+5. Plugin displays the response as text.
 
-Because ordinary Logic Pro plugins cannot freely inspect every track in a session by themselves, the supervisor feature will likely need one of these approaches:
+AI provider direction:
 
-- A dedicated supervisor plugin instance placed on the stereo output or a bus.
-- Local inter-plugin communication between instances.
-- A companion app or local service that receives analysis from all instances.
-- Explicit user export/import of mix state if host limitations block direct communication.
+- Primary path: OpenAI/ChatGPT API.
+- Investigate whether Apple on-device AI can be used for this. Do not assume it can directly critique arbitrary music audio inside an audio plugin.
+- If local Apple AI cannot accept the required audio input, use local DSP feature extraction plus an OpenAI request.
+- Raw audio upload is allowed as a product direction for MVP exploration, but make it explicit in the UI and keep the implementation off the audio thread.
 
-Do not assume Logic Pro exposes full project/session data to a plugin. Verify host and Audio Unit limitations before designing around them.
+## MVP 2: Structured Parameter Suggestions
 
-## OpenAI/API Requirements
+Goal: ask AI for concrete values that map to Mix Buddy's own plugin parameters.
 
-API integration should be designed around user-owned credentials:
+Initial parameters may include:
 
-- Do not hard-code API keys.
-- Do not commit secrets.
-- Store credentials using macOS Keychain or another secure local mechanism.
-- Provide clear status when the API is unavailable.
-- Keep API responses advisory by default; applying changes should be explicit unless the user enables automation.
+- Input gain
+- Output gain
+- EQ band frequency, gain, and Q
+- Compressor threshold, ratio, attack, release, and makeup gain
+- Pan
+- Short text notes explaining the recommendation
 
-For prompts and model requests, prefer structured JSON inputs/outputs describing measured audio features, current parameters, musical intent, and allowed actions. Avoid sending raw audio unless there is a clear product decision, privacy model, and technical reason to do so.
+Implementation rules:
 
-## Real-Time Audio Safety
+- Prefer structured JSON responses from the AI.
+- Parse recommendations into a local model before touching parameters.
+- Show suggestions to the user before applying.
+- Applying changes updates Mix Buddy's own JUCE parameters.
+- Do not assume Mix Buddy can directly control Logic Pro's native channel strip, stock EQ, fader, pan, sends, or other third-party plugins.
 
-Audio callbacks must avoid:
+## MVP 3: Supervisor Bus Prototype
+
+Goal: add a supervisor instance, likely on the stereo output or main bus, that coordinates multiple track instances.
+
+Expected model:
+
+1. Track instances publish local summaries and current Mix Buddy parameter state.
+2. A supervisor instance listens to the whole mix on the bus.
+3. The supervisor asks AI for whole-mix recommendations.
+4. The supervisor dispatches text or structured parameter instructions to track instances.
+5. Track instances show and optionally apply approved changes to their own JUCE parameters.
+
+Important limitation:
+
+- Do not assume Logic Pro exposes full project/session state to one plugin.
+- Inter-instance communication, a local coordinator service, or explicit user-driven export/import may be needed.
+
+## Architecture Boundaries
+
+Keep these concerns separate:
+
+- `PluginProcessor`: real-time-safe audio pass-through, parameter state, metering, and capture buffers.
+- `Analysis`: local feature extraction such as peak/RMS, loudness, spectrum, dynamics, stereo width, silence, and transient information.
+- `AIClient` / `OpenAIClient`: async request construction, upload, response parsing, retries, and errors.
+- `MixModel`: track summaries, plugin parameter values, AI recommendations, and apply decisions.
+- `Supervisor`: session-level coordination across plugin instances.
+- `PluginEditor`: UI controls, prompt input, status, response display, and apply buttons.
+
+Network requests, file I/O, model calls, and blocking work must never run on the audio thread.
+
+## Real-Time Audio Rules
+
+The audio callback must avoid:
 
 - Blocking network or file I/O.
-- Memory allocation in the hot path where avoidable.
+- Allocating memory in the hot path where avoidable.
 - Locks that may block unpredictably.
 - Logging from the audio thread.
 - Calling UI or API code directly.
 
-Use preallocated buffers, lock-free or carefully bounded queues, and background workers for analysis/API tasks.
+Use preallocated buffers, atomics, lock-free or bounded queues, and background workers/message-thread handoff.
 
-## Development Priorities
+## API And Privacy Rules
 
-Suggested order of work:
+- Do not hard-code API keys.
+- Do not commit secrets.
+- Prefer user-owned credentials.
+- Store credentials using macOS Keychain or another secure local mechanism.
+- Clearly show when audio or extracted features are being sent externally.
+- Keep AI responses advisory by default until the user explicitly applies changes.
 
-1. Decide framework and plugin format, likely JUCE targeting AU for Logic Pro.
-2. Convert the starter CLion executable into a minimal plugin that loads in a host.
-3. Add simple per-track metering and analysis.
-4. Add safe parameter controls for gain, EQ placeholders, compression placeholders, and panning.
+## Near-Term Priorities
+
+1. Replace the placeholder "Hello World" UI with a simple Mix Buddy shell.
+2. Add basic metering to prove real audio is flowing through the plugin.
+3. Add a text input for the user's prompt/context.
+4. Add a safe track audio capture path or feature extraction path.
 5. Add an async OpenAI client behind a narrow interface.
-6. Add a recommendation workflow that suggests settings without applying them automatically.
-7. Prototype inter-instance or companion-supervisor communication.
-8. Add the supervisor UI and whole-mix recommendation flow.
-9. Harden persistence, permissions, errors, and real-time behavior.
-
-## Repository State
-
-Current files:
-
-- `CMakeLists.txt`: default CLion CMake executable project.
-- `main.cpp`: default CLion hello-world program.
-- `AGENTS.md`: project guidance for future agents and development sessions.
-
-Generated CLion/CMake build output lives under `cmake-build-debug/` and should not be treated as source.
+6. Display AI response text in the plugin UI.
+7. Add structured recommendation parsing and plugin-owned parameters.
+8. Prototype inter-instance/supervisor communication only after single-track analysis works.
 
 ## Coding Guidance
 
-- Keep implementation changes small and testable.
-- Prefer clear module boundaries over putting plugin, UI, networking, and DSP code into one file.
-- Preserve real-time audio constraints even during prototypes.
-- Add comments only where they clarify non-obvious audio, threading, or host-integration behavior.
-- Before adding external dependencies, explain why they are needed and how they fit the plugin architecture.
-- When changing build files, keep CLion compatibility in mind.
-
-## Open Questions
-
-These decisions still need to be made before implementation:
-
-- Whether to use JUCE or Apple Audio Unit APIs directly.
-- Whether the first prototype should be AU only or also support VST3/standalone for testing.
-- How track instances and the supervisor should communicate.
-- What level of automatic mix adjustment is acceptable versus suggestion-only workflows.
-- Which OpenAI model/API shape should be used for the first prototype.
-- Whether any raw audio will ever be sent to the API, or only extracted analysis features.
+- Keep changes small and buildable.
+- Prefer JUCE and existing CMake patterns already in the repo.
+- Keep DSP, UI, networking, and model code in separate modules once they become non-trivial.
+- Preserve CLion compatibility.
+- Add external dependencies only when there is a clear reason.
+- Add comments only for non-obvious audio, threading, host, or API behavior.
