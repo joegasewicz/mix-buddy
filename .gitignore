@@ -1,6 +1,6 @@
 .idea/
-external
-external/
+
+
 cmake-build-debug
 
 logs/
