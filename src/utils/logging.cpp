@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "config.h"
+
 
 namespace
 {
@@ -29,7 +31,7 @@ void Log::initialise()
         return;
 
     juce::File logDir = getLogDirectory();
-    logDir.createDirectory();
+    logDir.getParentDirectory().createDirectory();
 
 
     logger = std::make_unique<juce::FileLogger>(
@@ -75,6 +77,8 @@ void Log::error(const juce::String &message)
  */
 juce::File Log::getLogFile()
 {
+    if constexpr (Config::MIXBUDDY_DEBUG)
+       return juce::File(Config::MIXBUDDY_LOG_DEBUG_DIRECTORY);
 
-    return getLogDirectory().getChildFile("mix-buddy.log");
+    return juce::File(Config::MIXBUDDY_LOG_DIRECTORY);
 }

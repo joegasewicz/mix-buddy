@@ -29,7 +29,6 @@ target_sources(MixBuddy
         PRIVATE
         src/PluginEditor.cpp
         src/PluginProcessor.cpp
-        src/config.cpp
         src/utils/logging.cpp
 )
 
