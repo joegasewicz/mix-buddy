@@ -1,4 +1,5 @@
 # Mix Buddy VST Plugin
+Mix Buddy is a VST audio plugin that helps producers analyze tracks and get AI-assisted mix feedback directly inside a DAW.
 
 <img src="assets/mixbuddy2.png" alt="Example" style="max-width: 400px;">
 
